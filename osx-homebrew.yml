@@ -1,0 +1,254 @@
+---
+#
+# Setup/update homebrew junk
+#
+- hosts: localhost
+  vars:
+    - git_netrc_src: "/share/git-core/contrib/credential/netrc/git-credential-netrc"
+    - git_netrc_dst: "/libexec/git-core/git-credential-netrc"
+  # Make shit happen!
+  tasks:
+    - name: Check if running under vagrant
+      stat: path=/vagrant
+      register: vagrant
+
+    - name: Get brew install location
+      shell: >-
+        brew config |
+        grep HOMEBREW_PREFIX |
+        awk -F': ' '{print $2}'
+      register: brew_home
+
+    - name: Update Homebrew
+      homebrew: update_homebrew=yes
+
+    - name: List outdated homebrews
+      command: brew outdated
+      register: outdated
+
+    - debug: msg="{{outdated.stdout}}"
+
+    - name: Upgrade Homebrew installs
+      homebrew: upgrade_all=yes
+
+    - name: Setup Homebrew taps
+      homebrew_tap: name={{item}} state=present
+      with_items:
+        - homebrew/dupes
+        - homebrew/science
+        - homebrew/versions
+        - mitchty/yuck
+        - mitchty/clang_scan_view
+        - mitchty/clang_scan_build
+
+    - name: Install tmux
+      homebrew: state=present name=tmux install_options=wrap-pbcopy-and-pbpaste
+
+    - name: Make tmux copy/paste with osx possible
+      homebrew: state=present name=reattach-to-user-namespace
+
+    - name: Install mosh from HEAD
+      homebrew: state=head name=mobile-shell
+
+    - name: Install basic tools
+      homebrew: name={{item}} state=present
+      with_items:
+        - gpg
+        - git
+        - ansible
+        - htop
+
+    # Ok so we need to setup the gpg credential helper for netrc
+    - name: Get installed brew git version
+      shell: >-
+        brew info git 2>&1 |
+        head -n 1 |
+        awk '{print $3}' |
+        sed -e 's/,//g'
+      ignore_errors: true
+      register: brew_git_version
+
+    - name: Create link for git-credential-netrc to work
+      file: >-
+        src="{{brew_home.stdout}}/Cellar/git/{{brew_git_version.stdout}}{{git_netrc_src}}"
+        dest="{{brew_home.stdout}}/Cellar/git/{{brew_git_version.stdout}}{{git_netrc_dst}}"
+        state=link
+
+    - name: Install emacs with cocoa/srgb options
+      homebrew: state=present name=emacs install_options=cocoa,srgb
+
+    - name: Install curl with openssl/async dns options
+      homebrew: state=present name=curl install_options=with-openssl,with-ares
+
+    - name: Install stuff that I might want to use more quickly
+      homebrew: name={{item}} state=present
+      with_items:
+        - youtube-dl
+        - ag
+        - ispell
+        - docbook
+        - asciidoc
+        - libxml2
+        - libxslt
+        - readline
+        - sqlite
+        - gdbm
+        - wakeonlan
+
+    - name: Install python with universal/framework options
+      homebrew: state=present name=python install_options=universal,framework
+
+    # all this because 10.9 doesn't include libxml2 in the platform
+    # headers, LAME, also grr
+    - name: Get libxml2 pkg path
+      shell: >-
+        brew --env libxml2 |
+        grep PKG_CONFIG_PATH |
+        awk -F'=' '{print $2}' |
+        sed -e 's/\"//g'
+      register: libxml_pkg_config_path
+
+    - name: Get libxml2 pkg libdir
+      shell: >-
+        brew --env libxml2 |
+        grep PKG_CONFIG_LIBDIR |
+        awk -F'=' '{print $2}' |
+        sed -e 's/\"//g'
+      register: libxml_pkg_config_libdir
+
+    - name: Get libxml2 CFLAGS
+      environment:
+        PKG_CONFIG_PATH: "{{libxml_pkg_config_path.stdout}}"
+        PKG_CONFIG_LIBDIR: "{{libxml_pkg_config_libdir.stdout}}"
+      command: pkg-config --cflags libxml-2.0
+      register: libxml_cflags
+
+    - name: Get libxml2 LIBS
+      environment:
+        PKG_CONFIG_PATH: "{{libxml_pkg_config_path.stdout}}"
+        PKG_CONFIG_LIBDIR: "{{libxml_pkg_config_libdir.stdout}}"
+      command: pkg-config --libs libxml-2.0
+      register: libxml_libs
+
+    - name: Install Python pip modules
+      environment:
+        CFLAGS: "{{libxml_cflags.stdout}}"
+        LIBS: "{{libxml_libs}}.stdout"
+        PKG_CONFIG_PATH: "{{libxml_pkg_config_path.stdout}}"
+        PKG_CONFIG_LIBDIR: "{{libxml_pkg_config_libdir.stdout}}"
+        XML_CATALOG_FILES: "{{brew_home}}/etc/xml/catalog"
+        DYLD_LIBRARY_PATH: "{{brew_home}}/lib"
+      command: "{{brew_home.stdout}}/bin/pip install --upgrade {{item}}"
+      with_items:
+        - docutils
+        - howdoi
+        - pep8
+        - pyflakes
+        - flake8
+
+    - name: Link Python
+      homebrew: state=linked name=python
+
+    - name: Install ruby
+      homebrew: state=present name=ruby
+
+    - name: Install rubygems-update
+      command: "{{brew_home.stdout}}/bin/gem install --no-ri --no-rdoc rubygems-update"
+
+    - name: Install/Upgrade ruby gems
+      command: "{{brew_home.stdout}}/bin/gem install --no-ri --no-rdoc {{item}}"
+      with_items:
+        - pry
+        - maid
+        - gist
+
+    - name: Upgrade any old gems
+      command: "{{brew_home.stdout}}/bin/gem update -f"
+
+    - name: Upgrade any old gems --system
+      command: "{{brew_home.stdout}}/bin/gem update --system -f"
+
+    - name: gem clean
+      command: "{{brew_home.stdout}}/bin/gem clean"
+
+    - name: Link ruby
+      homebrew: state=linked name=ruby
+
+    - name: Install perl
+      homebrew: state=present name=perl
+
+    - name: Get hombrew perl /bin directory
+      command: brew --prefix perl
+      register: brew_perl_bin
+
+    # God, for annoying. So File::HomeDir sucks balls and its test suite
+    # fails on 10 tests when run under a user that isn't running a gui
+    # on osx. Yeah rare sure why not. But christ, why is the test suite
+    # dying and fix that. Time to file bugs I guess.
+    #
+    # So when under vagrant or rather /vagrant existing, don't install
+    # any stupid perl modules because they have ass tests that fail
+    # every damn time.
+    - name: Install cpanminus
+#      when: vagrant.stat.exists == false
+      shell: >-
+        curl -kL http://cpanmin.us |
+        "{{brew_perl_bin.stdout}}/bin/perl" - App::cpanminus --force --notest
+
+    - name: Install/Update cpan modules
+      command: "{{brew_perl_bin.stdout}}/bin/cpanm --notest --force {{item}}"
+#      when: vagrant.stat.exists == false
+      with_items:
+        - File::HomeDir
+        - App::cpanminus
+        - App::rainbarf
+        - Perl::Tidy
+        - Perl::Critic
+        - Encode
+        - Storable
+        - List::Util
+        - Hash::Util
+        - IO::Socket
+
+    - name: Link perl
+      homebrew: state=present name=perl
+
+    - name: Install postgres without perl/tcl/python options
+      homebrew: state=present name=postgres install_options=no-perl,no-tcl,without-python
+
+    - name: Install the rest of the lot
+      homebrew: name={{item}} state=present
+      with_items:
+        - lastpass-cli
+        - keychain
+        - yuck
+        - openssl
+        - pigz
+        - xz
+        - pixz
+        - pbzip2
+        - pv
+        - iperf
+        - nmap
+        - sntop
+        - rsync
+        - entr
+        - iftop
+        - tree
+        - pngcrush
+        - wget
+        - mercurial
+        - ack
+        - ncurses
+        - go
+        - python3
+        - clang-scan-view
+        - clang-scan-build
+        - gcc
+        - llvm
+        - neon
+        - mpv
+        - subversion16
+
+    - name: brew cleanup
+      command: brew cleanup

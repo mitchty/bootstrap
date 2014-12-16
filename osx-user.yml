@@ -1,0 +1,214 @@
+---
+#
+# Basically, all this is the crap I do to an osx system. Or the start
+# of it at least.
+#
+# In a less civilized era, I used shell scripts for crap like this.
+# or... nothing, the horror that ensued after a new install
+# was legion.
+#
+- hosts: localhost
+  # All the stupid handlers to restart/kill crap as needed later
+  handlers:
+    - name: restart dock
+      command: killall Dock
+      ignore_errors: true
+    - name: kill finder with fire
+      command: killall Finder
+      ignore_errors: true
+  # mostly for 80 char lines tbh
+  vars:
+    - kb_key: "com.apple.keyboard.modifiermapping"
+    - kb_map_dest: "HIDKeyboardModifierMappingDst"
+    - kb_map_src: "HIDKeyboardModifierMappingSrc"
+  # Make shit happen!
+  tasks:
+# GlobalDomain type defaults
+    # Caps lock sucks balls, make it control
+    - name: "Get internal usb keyboard vendor/product ids"
+      shell: >
+        ioreg -n IOHIDKeyboard -r |
+        grep -E 'VendorID"|ProductID' |
+        awk '{print $4}' |
+        paste -s -d'-\n' -
+      register: kb_id
+
+    # here be hacks matey, need to learn how to capture multiline
+    # output so that ansible doesn't complain
+    - name: "Read builtin keyboard map for caps lock setup"
+      shell: >
+        defaults -currentHost read -g
+        "{{ kb_key }}.{{ kb_id.stdout }}-0" |
+        perl -pe 's/(\n|\s+|{|}|\(|\)|\=|\;)//g' |
+        perl -pe 's/HIDKeyboardModifierMapping//g'
+      register: current_layout
+
+    # Note, this may not register until logging out/in.
+    # Killing cfprefsd (both root and user) doesn't force a reload
+    # of mavericks prefs cache (ungh why was that introduced)
+    # nor does stop/starting com.apple.syncdefaultsd either.
+    # nor does rereading the plist. I'm at a loss
+    # Maybe look into applescripting it I guess. But oh how I hate
+    # applescript.
+    - name: "Ensure builtin keyboard maps caps lock to control"
+      shell: >
+        defaults -currentHost write -g
+        "{{ kb_key }}.{{ kb_id.stdout }}-0"
+        -array "{HIDKeyboardModifierMappingDst=2;HIDKeyboardModifierMappingSrc=0;}"
+      when: current_layout.stdout != "Dst2Src0"
+
+    # Expand the save panel by default
+    - name: "Get expanded save mode"
+      command: "defaults read NSGlobalDomain NSNavPanelExpandedStateForSaveMode"
+      register: g_save_mode
+      ignore_errors: yes
+
+    - name: "Set expanded save panel mode"
+      command: "defaults write NSGlobalDomain NSNavPanelExpandedStateForSaveMode -bool true"
+      when: g_save_mode.stdout != "1"
+
+    - name: "Get expanded save mode2"
+      command: "defaults read NSGlobalDomain NSNavPanelExpandedStateForSaveMode2"
+      register: g_save_mode2
+      ignore_errors: yes
+
+    - name: "Set expanded save panel mode2"
+      command: "defaults write NSGlobalDomain NSNavPanelExpandedStateForSaveMode2 -bool true"
+      when: g_save_mode2.stdout != "1"
+
+    # So, the whole quarantine window is annoying, don't display it
+    - name: "Get launchservices quarantine setting"
+      command: "defaults read com.apple.LaunchServices LSQuarantine"
+      register: g_save_mode2
+      ignore_errors: yes
+
+    - name: "Set launchservices quarantine setting to off"
+      command: "defaults write com.apple.LaunchServices LSQuarantine -bool false"
+      when: g_save_mode2.stdout != "0"
+
+   # Double clicking title bars means minimize kthxbai
+    - name: "Get AppleMiniaturizeOnDoubleClick setting"
+      command: "defaults read NSGlobalDomain AppleMiniaturizeOnDoubleClick"
+      register: g_min_on_double_click
+      ignore_errors: yes
+
+    - name: "Set AppleMiniaturizeOnDoubleClick to true"
+      command: "defaults write NSGlobalDomain AppleMiniaturizeOnDoubleClick -bool false"
+      when: g_min_on_double_click.stdout != "0"
+# Dock
+    # Dock goes on zie right, bottom is for heathens!
+    - name: "Get dock orientation value"
+      command: "defaults read com.apple.dock orientation"
+      register: dock_orientation
+      ignore_errors: yes
+
+    - name: "Set dock orientation to the left, where sane humans put it"
+      command: "defaults write com.apple.dock orientation -string left"
+      when: dock_orientation.stdout != "left"
+      notify:
+        - restart dock
+
+    # Dock should autohide because go away dammit
+    - name: "Get dock autohide value"
+      command: "defaults read com.apple.dock autohide"
+      register: dock_autohide
+      ignore_errors: yes
+
+    - name: "Set dock autohide to true"
+      command: "defaults write com.apple.dock autohide -bool true"
+      when: dock_autohide.stdout != "1"
+      notify:
+        - restart dock
+
+    # Dock should dim apps that have been hidden
+    - name: "Get dock showhidden value"
+      command: "defaults read com.apple.dock showhidden"
+      register: dock_showhidden
+      ignore_errors: yes
+
+    - name: "Set dock showhidden to true"
+      command: "defaults write com.apple.dock showhidden -bool true"
+      when: dock_showhidden.stdout != "1"
+      notify:
+        - restart dock
+
+    # Dock should use the hidden "Suck" animation, cause reasons.
+    - name: "Get dock mineffect value"
+      command: "defaults read com.apple.dock mineffect"
+      register: dock_mineffect
+      ignore_errors: yes
+
+    - name: "Set dock mineffect to Suck"
+      command: "defaults write com.apple.dock mineffect -string Suck"
+      when: dock_mineffect.stdout != "Suck"
+      notify:
+        - restart dock
+
+    # Dock should never use the dashboard, you were cool 10 years ago
+    # but sorry dashboard, I think we should see other people.
+    - name: "Get dock mcx-disabled value"
+      command: "defaults read com.apple.dock mcx-disabled"
+      register: dock_mcx_disabled
+      ignore_errors: yes
+
+    - name: "Set dock mcs-disabled to true"
+      command: "defaults write com.apple.dock mcx-disabled -bool true"
+      when: dock_mcx_disabled.stdout != "1"
+      notify:
+        - restart dock
+
+# Finder
+    # I prefer to be able to have finder piss off until I need it
+    - name: "Get finder QuitMenuItem value"
+      command: "defaults read com.apple.finder QuitMenuItem"
+      register: finder_quitmenuitem
+      ignore_errors: yes
+
+    - name: "Set finder QuitMenuItem to true"
+      command: "defaults write com.apple.finder QuitMenuItem -bool true"
+      when: finder_quitmenuitem.stdout != "1"
+      notify:
+        - kill finder with fire
+
+    # STOP WRITING .DS_Store files on network volumes finder
+    - name: "Get finder DSDontWriteNetworkStores value"
+      command: "defaults read com.apple.finder DSDontWriteNetworkStores"
+      register: finder_dsdontwritenetworkstores
+      ignore_errors: yes
+
+    - name: "Set finder QuitMenuItem to true"
+      command: "defaults write com.apple.finder DSDontWriteNetworkStores -bool true"
+      when: finder_dsdontwritenetworkstores.stdout != "1"
+      notify:
+        - kill finder with fire
+
+    # show file extensions always, cause security/sanity
+    - name: "Get finder AppleShowAllExtensions value"
+      command: "defaults read com.apple.finder AppleShowAllExtensions"
+      register: finder_appleshowallextensions
+      ignore_errors: yes
+
+    - name: "Set finder AppleShowAllExtensions to true"
+      command: "defaults write com.apple.finder AppleShowAllExtensions -bool true"
+      when: finder_appleshowallextensions.stdout != "1"
+      notify:
+        - kill finder with fire
+
+# Trackpad crap
+    - name: "Does the trackpad allow tap to click"
+      command: "defaults read com.apple.driver.AppleBluetoothMultitouch.trackpad Clicking"
+      register: trackpad_click_tap
+      ignore_errors: yes
+
+    - name: "Set the trackpad to tap to click"
+      command: "defaults write com.apple.driver.AppleBluetoothMultitouch.trackpad Clicking -bool true"
+      when: trackpad_click_tap.stdout != "1"
+
+    - name: "Does the trackpad allow double tap to right click"
+      command: "defaults read com.apple.driver.AppleBluetoothMultitouch.trackpad TrackpadRightClick"
+      register: trackpad_rightclick_tap
+      ignore_errors: yes
+
+    - name: "Set the trackpad to double tap to right click"
+      command: "defaults write com.apple.driver.AppleBluetoothMultitouch.trackpad TrackpadRightClick -bool true"
+      when: trackpad_rightclick_tap.stdout != "1"

@@ -5,7 +5,7 @@ VAGRANTFILE_API_VERSION = "2"
 
 Vagrant.configure(VAGRANTFILE_API_VERSION) do |config|
   # For now, test on yosemite+mavericks, sort out linux/bsd later
-  config.vm.define "yosemite" do |yosemite|
+  config.vm.define "yosemite", primary: true do |yosemite|
     yosemite.vm.box = "yosemite"
     yosemite.vm.provider "vmware_fusion" do |v|
       v.gui = true
@@ -27,5 +27,6 @@ Vagrant.configure(VAGRANTFILE_API_VERSION) do |config|
   # provision via ansible from there on out
   config.vm.provision "shell",
                       privileged: false,
-                      inline: "cd /vagrant && cat bootstrap.sh | sh -x"
+                      keep_color: true,
+                      inline: "/vagrant/bootstrap.sh"
 end

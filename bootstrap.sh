@@ -4,7 +4,8 @@
 # Cause... setting shit up should be easy. And I'm lazy.
 #
 local_files=${local_files:=yes}
-brew_home=/usr/local
+osx_release=$(sw_vers -productVersion | sed -e 's/\.[0-9]\{1\}//2')
+brew_home=/usr/local/brew/${osx_release}
 iam_user=$(id -u -nr)
 iam_group=$(id -g -nr)
 brew_bin=${brew_home}/bin
@@ -13,6 +14,18 @@ ansible_verbose=${ansible_verbose:=""}
 [ "${VERBOSE}" != '' ] && ansible_verbose="-v"
 
 [ -d "/vagrant" ] && sut=true
+
+sut_guard()
+{
+  # Let local testing in /vagrant work.
+  if [ ${sut} = "true" ]; then
+    cd /vagrant
+  else
+    cd "${base_home}"
+  fi
+}
+
+export PATH=${brew_bin}:${PATH}
 
 homebrew_setup()
 {
@@ -40,23 +53,13 @@ homebrew_setup()
     if [ ! -e "${instfile}" ]; then
       echo "Install homebrew for the first time"
       trap 'rm -fr "${instfile}"; exit' INT TERM EXIT
-      curl -fsSL -o "${instfile}" ${brew_url}
-      chmod 755 "${instfile}"
-      "${instfile}" --fast
-      rm -f "${instfile}"
+      git clone "https://github.com/Homebrew/homebrew" ${brew_home}
       trap - INT TERM EXIT
-     else
-	echo "lock file found ${instfile}"
+    else
+      echo "lock file found ${instfile}"
       exit 2
     fi
     rm -f "${instfile}"
-  fi
-
-  # Use bottles when possible?
-  if [ ! -z "${FASTER}" ]; then
-    echo Building from source
-    sleep 3
-    export HOMEBREW_BUILD_FROM_SOURCE=yesplease
   fi
 
   export PATH=${brew_bin}:${PATH}
@@ -73,13 +76,6 @@ homebrew_setup()
 # still a work in progress to be honest.
 ansible()
 {
-  # Let local testing in /vagrant work.
-  if [ ${sut} = "true" ]; then
-    cd /vagrant
-  else
-    cd "${base_home}"
-  fi
-
   # Allow this sudo to fail if we get prompted or aren't setup
   set +e
   cmd="ansible-playbook ${ansible_verbose} --inventory-file inventory --sudo bootstrap.yml"
@@ -94,9 +90,9 @@ ansible()
     ${cmd}
   fi
 
-#  for playbook in osx-user osx-homebrew; do
-#    ansible_play ${playbook}
-#  done
+ for playbook in osx-user osx-homebrew cabal; do
+   ansible_play ${playbook}
+ done
 }
 
 ansible_play()
@@ -106,6 +102,8 @@ ansible_play()
   echo "${cmd}"
   ${cmd}
 }
+
+sut_guard
 
 case $1 in
 ansible)
