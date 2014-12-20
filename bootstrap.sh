@@ -90,9 +90,11 @@ ansible()
     ${cmd}
   fi
 
- for playbook in osx-user osx-homebrew haskell; do
-   ansible_play ${playbook}
- done
+  if [ "${sut}" != "true" ]; then
+    for playbook in osx-user osx-homebrew haskell; do
+      ansible_play ${playbook}
+    done
+  fi
 }
 
 ansible_play()
@@ -101,6 +103,14 @@ ansible_play()
   cmd="ansible-playbook ${ansible_verbose} --inventory-file inventory ${playbook}.yml"
   echo "${cmd}"
   ${cmd}
+}
+
+maybe_homebrew()
+{
+  if [ "$(uname)" = "Darwin" ]; then
+    echo "on osx, going to install homebrew+ansible"
+    homebrew_setup
+  fi
 }
 
 sut_guard
@@ -117,10 +127,7 @@ homebrew)
   homebrew_setup
   ;;
 *)
-  if [ "$(uname)" = "Darwin" ]; then
-    echo "on osx, going to install homebrew+ansible"
-    homebrew_setup
-  fi
+  maybe_homebrew
   ansible
   exit $?
   ;;

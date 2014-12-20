@@ -4,6 +4,7 @@
 #
 - hosts: localhost
   vars:
+    - latest_cabal: 1.20.0.4
     - sandbox_install:
         - pandoc
         - shellcheck
@@ -18,28 +19,33 @@
         - cgrep
         - stylish-haskell
         - hasktags
-        - hoogle
         - cabal-meta
         - ghc-mod
         - hindent
   tasks:
-    - name: Download haskell platform
+    - name: Allo haskell? Allo?
+      command: ghc --version
+      register: ghc
+      ignore_errors: true
+
+    # TODO: do all this osx crud in an include maybe instead of so many when clauses.
+    - name: Download haskell platform (OSX)
       get_url: url='https://www.haskell.org/platform/download/2014.2.0.0/Haskell%20Platform%202014.2.0.0%2064bit.signed.pkg'
                dest=/tmp/haskell_platform.pkg
                timeout=300
+      when: "ansible_os_family == 'Darwin' and ghc.rc != 0"
 
     - name: Install haskell platform
       command: sudo installer -target / -pkg /tmp/haskell_platform.pkg
-      when: "ansible_os_family == 'Darwin'"
+      when: "ansible_os_family == 'Darwin' and ghc.rc != 0"
       ignore_errors: True
 #     NOTE: ^^^^ have to ignore because of
 # https://github.com/haskell/haskell-platform/issues/151
 
-
     - name: Remove tmp file
       command: rm /tmp/haskell_platform.pkg
       ignore_errors: True
-      when: "ansible_os_family == 'Darwin'"
+      when: "ansible_os_family == 'Darwin' and ghc.rc != 0"
 
     - name: ~/.cabal/bin
       file: state=directory path=~/.cabal/bin
@@ -53,28 +59,28 @@
       when: "ansible_os_family == 'Darwin'"
 
     - name: cabal update
+      environment:
+        PATH: ~/.cabal/bin:/usr/local/bin:/usr/bin:/usr/sbin:/bin:/sbin
       command: cabal update
+
+    - name: cabal up to date?
+      environment:
+        PATH: ~/.cabal/bin:/usr/local/bin:/usr/bin:/usr/sbin:/bin:/sbin
+      shell: >-
+        cabal --version | grep install | awk '{print $3}'
+      register: cabal_version
 
     - name: cabal install cabal cabal-install
       environment:
         PATH: ~/.cabal/bin:/usr/local/bin:/usr/bin:/usr/sbin:/bin:/sbin
       command: cabal install -v cabal cabal-install
+      when: "cabal_version.stdout != '{{ latest_cabal }}'"
 
     - name: install sandboxed binaries
-      environment:
-        PATH: ~/.cabal/bin:/usr/local/bin:/usr/bin:/usr/sbin:/bin:/sbin
-        TMPDIR: /tmp
-      shell: >-
-        temp=$(mktemp -d -t "cabalsandbox-{{item}}");
-        cd ${temp} &&
-        cabal sandbox init &&
-        cabal install -v "{{item}}" &&
-        cp .cabal-sandbox/bin/* ~/.cabal/bin &&
-        cd / &&
-        rm -fr ${temp}
+      script:
+        ./scripts/cabal-install-sandboxed.sh {{ item }}
+        creates=~/.cabal/bin/{{ item }}
       with_items: sandbox_install
-      when: "ls -dal ~/.cabal/bin/{{ item }} != 0" ... sorta
-
 
     - name: Hoogle update
       command: ~/.cabal/bin/hoogle data
