@@ -1,54 +1,10 @@
 ---
 #
-# Setup cabal
+# Setup ghc/cabal
 #
 - hosts: localhost
-  tasks:
-    - name: Download haskell platform
-      get_url: url='https://www.haskell.org/platform/download/2014.2.0.0/Haskell%20Platform%202014.2.0.0%2064bit.signed.pkg'
-               dest=/tmp/haskell_platform.pkg
-               timeout=300
-
-    - name: Install haskell platform
-      command: sudo installer -target / -pkg /tmp/haskell_platform.pkg
-      ignore_errors: True
-#     NOTE: ^^^^ have to ignore because of
-# https://github.com/haskell/haskell-platform/issues/151
-
-    - name: Remove tmp file
-      command: rm /tmp/haskell_platform.pkg
-      ignore_errors: True
-
-    - name: ~/.cabal/bin
-      file: state=directory path=~/.cabal/bin
-
-    - name: ~/Library/Haskell
-      file: state=directory path=~/Library/Haskell
-      when: "ansible_os_family == 'Darwin'"
-
-    - name: ~/Library/Haskell/bin -> ~/.cabal/bin
-      file: state=link force=yes src=~/.cabal/bin path=~/Library/Haskell/bin
-      when: "ansible_os_family == 'Darwin'"
-
-    - name: cabal update
-      command: cabal update
-
-    - name: cabal install cabal cabal-install
-      command:  cabal install -v cabal cabal-install
-
-    - name: install binaries with cabal sandboxes
-      environment:
-        PATH: ~/.cabal/bin:/usr/local/bin:/usr/bin:/usr/sbin:/bin:/sbin
-        TMPDIR: /tmp
-      shell: >-
-        temp=$(mktemp -d -t "cabalsandbox-{{item}}");
-        cd ${temp} &&
-        cabal sandbox init &&
-        cabal install -v "{{item}}" &&
-        cp .cabal-sandbox/bin/* ~/.cabal/bin &&
-        cd / &&
-        rm -fr ${temp}
-      with_items:
+  vars:
+    - sandbox_install:
         - pandoc
         - shellcheck
         - shake
@@ -66,6 +22,59 @@
         - cabal-meta
         - ghc-mod
         - hindent
+  tasks:
+    - name: Download haskell platform
+      get_url: url='https://www.haskell.org/platform/download/2014.2.0.0/Haskell%20Platform%202014.2.0.0%2064bit.signed.pkg'
+               dest=/tmp/haskell_platform.pkg
+               timeout=300
+
+    - name: Install haskell platform
+      command: sudo installer -target / -pkg /tmp/haskell_platform.pkg
+      when: "ansible_os_family == 'Darwin'"
+      ignore_errors: True
+#     NOTE: ^^^^ have to ignore because of
+# https://github.com/haskell/haskell-platform/issues/151
+
+
+    - name: Remove tmp file
+      command: rm /tmp/haskell_platform.pkg
+      ignore_errors: True
+      when: "ansible_os_family == 'Darwin'"
+
+    - name: ~/.cabal/bin
+      file: state=directory path=~/.cabal/bin
+
+    - name: ~/Library/Haskell
+      file: state=directory path=~/Library/Haskell
+      when: "ansible_os_family == 'Darwin'"
+
+    - name: ~/Library/Haskell/bin -> ~/.cabal/bin
+      file: state=link force=yes src=~/.cabal/bin path=~/Library/Haskell/bin
+      when: "ansible_os_family == 'Darwin'"
+
+    - name: cabal update
+      command: cabal update
+
+    - name: cabal install cabal cabal-install
+      environment:
+        PATH: ~/.cabal/bin:/usr/local/bin:/usr/bin:/usr/sbin:/bin:/sbin
+      command: cabal install -v cabal cabal-install
+
+    - name: install sandboxed binaries
+      environment:
+        PATH: ~/.cabal/bin:/usr/local/bin:/usr/bin:/usr/sbin:/bin:/sbin
+        TMPDIR: /tmp
+      shell: >-
+        temp=$(mktemp -d -t "cabalsandbox-{{item}}");
+        cd ${temp} &&
+        cabal sandbox init &&
+        cabal install -v "{{item}}" &&
+        cp .cabal-sandbox/bin/* ~/.cabal/bin &&
+        cd / &&
+        rm -fr ${temp}
+      with_items: sandbox_install
+      when: "ls -dal ~/.cabal/bin/{{ item }} != 0" ... sorta
+
 
     - name: Hoogle update
       command: ~/.cabal/bin/hoogle data

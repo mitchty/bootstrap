@@ -90,7 +90,7 @@ ansible()
     ${cmd}
   fi
 
- for playbook in osx-user osx-homebrew cabal; do
+ for playbook in osx-user osx-homebrew haskell; do
    ansible_play ${playbook}
  done
 }

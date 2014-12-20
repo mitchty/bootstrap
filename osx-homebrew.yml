@@ -40,6 +40,7 @@
         - mitchty/yuck
         - mitchty/clang_scan_view
         - mitchty/clang_scan_build
+        - mpv-player/mpv
 
     - name: Install tmux
       homebrew: state=present name=tmux install_options=wrap-pbcopy-and-pbpaste
