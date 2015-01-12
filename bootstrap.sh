@@ -10,6 +10,7 @@ iam_user=$(id -u -nr)
 iam_group=$(id -g -nr)
 brew_bin=${brew_home}/bin
 brew_itself=${brew_bin}/brew
+export PATH=${brew_bin}:${PATH}
 ansible_verbose=${ansible_verbose:=""}
 [ "${VERBOSE}" != '' ] && ansible_verbose="-v"
 
@@ -18,21 +19,19 @@ ansible_verbose=${ansible_verbose:=""}
 sut_guard()
 {
   # Let local testing in /vagrant work.
-  if [ ${sut} = "true" ]; then
+  if [ "${sut}" = "true" ]; then
     cd /vagrant
   else
     cd "${base_home}"
   fi
 }
 
-export PATH=${brew_bin}:${PATH}
-
 homebrew_setup()
 {
   # Find out when crap breaks faster...ish
   set -e
 
-  if [ ! -d ${brew_home} ]; then
+  if [ ! -d "${brew_home}" ]; then
     cmd="sudo mkdir -p ${brew_home}"
     echo "${cmd}"
     ${cmd}
@@ -42,18 +41,17 @@ homebrew_setup()
   echo "${cmd}"
   ${cmd}
 
-  if [ ! -e ${brew_itself} ]; then
+  if [ ! -e "${brew_itself}" ]; then
     echo "Making sure that xcode/git will run"
     cmd="sudo xcodebuild -license accept"
     echo "${cmd}"
     ${cmd}
 
-    brew_url="https://raw.githubusercontent.com/Homebrew/install/master/install"
     instfile="${TMPDIR}/brew-install"
     if [ ! -e "${instfile}" ]; then
       echo "Install homebrew for the first time"
       trap 'rm -fr "${instfile}"; exit' INT TERM EXIT
-      git clone "https://github.com/Homebrew/homebrew" ${brew_home}
+      git clone "https://github.com/Homebrew/homebrew" "${brew_home}"
       trap - INT TERM EXIT
     else
       echo "lock file found ${instfile}"
@@ -65,7 +63,7 @@ homebrew_setup()
   export PATH=${brew_bin}:${PATH}
 
   for prep in git ansible; do
-    if [ ! -e ${brew_bin}/${prep} ]; then
+    if [ ! -e "${brew_bin}/${prep}" ]; then
       cmd="brew install ${prep}"
       echo "${cmd}"
       ${cmd}

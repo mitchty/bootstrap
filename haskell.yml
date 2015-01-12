@@ -4,24 +4,24 @@
 #
 - hosts: localhost
   vars:
-    - latest_cabal: 1.20.0.4
     - sandbox_install:
         - pandoc
         - shellcheck
-        - shake
-        - bake
         - happy
         - alex
         - c2hs
         - hi
         - hlint
-        - hspec
         - cgrep
         - stylish-haskell
         - hasktags
-        - cabal-meta
         - ghc-mod
         - hindent
+        - cabal-meta
+    - regular_install:
+        - shake
+        - bake
+#        - hoogle
   tasks:
     - name: Allo haskell? Allo?
       command: ghc --version
@@ -35,8 +35,10 @@
                timeout=300
       when: "ansible_os_family == 'Darwin' and ghc.rc != 0"
 
-    - name: Install haskell platform
-      command: sudo installer -target / -pkg /tmp/haskell_platform.pkg
+    - name: root@localhost install haskell platform
+      command: installer -target / -pkg /tmp/haskell_platform.pkg
+      sudo: yes
+      sudo_user: root
       when: "ansible_os_family == 'Darwin' and ghc.rc != 0"
       ignore_errors: True
 #     NOTE: ^^^^ have to ignore because of
@@ -47,21 +49,59 @@
       ignore_errors: True
       when: "ansible_os_family == 'Darwin' and ghc.rc != 0"
 
-    - name: ~/.cabal/bin
-      file: state=directory path=~/.cabal/bin
+      # I don't understand why this is ever necessary
+      # Maybe only do this if/when ghc-pkg check outputs WARNING:
+      # ?
+    - name: root@localhost ghc-pkg recache
+      command: ghc-pkg recache
+      sudo: yes
+      sudo_user: root
+      when: "ansible_os_family == 'Darwin'"
 
     - name: ~/Library/Haskell
       file: state=directory path=~/Library/Haskell
       when: "ansible_os_family == 'Darwin'"
 
-    - name: ~/Library/Haskell/bin -> ~/.cabal/bin
-      file: state=link force=yes src=~/.cabal/bin path=~/Library/Haskell/bin
+    - name: ln ~/Library/Haskell -> ~/.cabal
+      file: state=link force=yes path=~/Library/Haskell src=~/.cabal
       when: "ansible_os_family == 'Darwin'"
+
+    - name: ~/.cabal
+      file: state=directory path=~/.cabal
+      when: "ansible_os_family != 'Darwin'"
+
+    - name: ~/.cabal/bin
+      file: state=directory path=~/.cabal/bin
+
+
+    # - name: ~/.cabal
+    #   file: state=directory path=~/.cabal
+
+    # - name: ~/.cabal/bin
+    #   file: state=directory path=~/.cabal/bin
+
+    # - name: ~/Library/Haskell
+    #   file: state=directory path=~/Library/Haskell
+    #   when: "ansible_os_family == 'Darwin'"
+
+    # - name: ln ~/.cabal/bin -> ~/Library/Haskell/bin
+    #   file: state=link force=yes path=~/.cabal/bin src=~/Library/Haskell/bin
+    #   when: "ansible_os_family == 'Darwin'"
 
     - name: cabal update
       environment:
         PATH: ~/.cabal/bin:/usr/local/bin:/usr/bin:/usr/sbin:/bin:/sbin
       command: cabal update
+
+    # This is a total hack... but if it breaks deal with it then
+    - name: get latest cabal-install version
+      environment:
+        PATH: ~/.cabal/bin:/usr/local/bin:/usr/bin:/usr/sbin:/bin:/sbin
+      shell: >-
+        cabal info cabal-install | grep -A1 'Versions avail' | grep others | sed -e 's/.*\, //' -e 's/ .*//'
+      register: latest_cabal
+
+    - debug: msg="Parsed latest cabal version as {{ latest_cabal.stdout }}"
 
     - name: cabal up to date?
       environment:
@@ -74,13 +114,36 @@
       environment:
         PATH: ~/.cabal/bin:/usr/local/bin:/usr/bin:/usr/sbin:/bin:/sbin
       command: cabal install -v cabal cabal-install
-      when: "cabal_version.stdout != '{{ latest_cabal }}'"
+      when: "cabal_version.stdout != '{{ latest_cabal.stdout }}'"
+
+      # This stuff either can't (or shouldn't) be installed via a sanbox
+      # most of this falls into the latter camp honestly.
+      #
+      # Either I have to fixup rpath's in the binary, or it needs
+      # some library or another at runtime.
+      #
+      # Needs to be kept to a minimum if possible, these things get
+      # annoying conflicts with dependencies if not.
+    - name: install regular binaries
+      command: cabal install {{ item }}
+      with_items: regular_install
+
+    - name: install hspec specially
+      script: >-
+        ./scripts/cabal-install-sandboxed.sh hspec
+        creates=~/.cabal/bin/hspec-discover
 
     - name: install sandboxed binaries
-      script:
+      script: >-
         ./scripts/cabal-install-sandboxed.sh {{ item }}
         creates=~/.cabal/bin/{{ item }}
       with_items: sandbox_install
 
     - name: Hoogle update
       command: ~/.cabal/bin/hoogle data
+
+    - name: Backing everything up
+      shell: >-
+        dir=$(pwd)
+        cd ${HOME} && \
+        pax -x sv4cpio -wz ${dir}/cabal-{{ ansible_date_time.iso8601 }}.cpio.gz .cabal ~/.ghc
