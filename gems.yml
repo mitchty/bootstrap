@@ -1,0 +1,15 @@
+#
+# Ruby gems playbook
+#
+- name: gem install --no-ri/rdoc
+  command: "{{gem_cmd}} install --no-ri --no-rdoc {{item}}"
+  with_items: gems
+
+- name: gem update -f
+  command: "{{gem_cmd}} update -f"
+
+- name: gem update --system -f
+  command: "{{gem_cmd}} update --system -f"
+
+- name: gem clean
+  command: "{{gem_cmd}} clean"
