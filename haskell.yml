@@ -23,6 +23,7 @@
     - regular_install:
         - alex
         - happy
+        - cpphs
     - cabal_env:
         PATH: "{{ ansible_env.HOME }}/.cabal/bin:/usr/local/bin:/usr/bin:/usr/sbin:/bin:/sbin"
     - cabin_env:
