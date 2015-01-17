@@ -78,6 +78,7 @@
     - brew_head:
         - mobile-shell
     - brew_linked:
+        - ruby
         - perl
         - python
     - pips:
@@ -202,7 +203,7 @@
       command: brew --prefix ruby
       register: brew_ruby_dir
 
-    - include: gems.yml gem_cmd="{{brew_ruby_dir.stdout}}/bin/gem" gems=gems gem_cmd=gem
+    - include: gems.yml gem_cmd="{{brew_ruby_dir.stdout}}/bin/gem" gems=gems
 
     - name: Get hombrew perl /bin directory
       command: brew --prefix perl
@@ -218,7 +219,9 @@
       with_items: cpans
 
     - name: Install state=linked brews
-      homebrew: state=linked name={{ item }}
+     # oh no this would be too effing easy but no
+     # homebrew: state=linked name={{ item }} --with-options=overwrite
+      command: brew link --force --overwrite {{item}}
       with_items: brew_linked
 
     - name: brew cleanup
