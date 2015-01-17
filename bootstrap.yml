@@ -1,8 +1,62 @@
 ---
 - hosts: localhost
   vars:
+    osx_java:
+      - appletviewer
+      - apt
+      - extcheck
+      - idlj
+      - jar
+      - jarsigner
+      - java
+      - javac
+      - javadoc
+      - javah
+      - javap
+      - javaws
+      - jcmd
+      - jconsole
+      - jdb
+      - jhat
+      - jinfo
+      - jmap
+      - jmc
+      - jps
+      - jrunscript
+      - jsadebugd
+      - jstack
+      - jstat
+      - jstatd
+      - jvisualvm
+      - keytool
+      - native2ascii
+      - orbd
+      - pack200
+      - policytool
+      - rmic
+      - rmid
+      - rmiregistry
+      - schemagen
+      - serialver
+      - servertool
+      - tnameserv
+      - unpack200
+      - wsgen
+      - wsimport
+      - xjc
   tasks:
     - name: Setup /etc/sudoers entry
       lineinfile: dest=/etc/sudoers
                   state=present
                   line='mitch ALL=(ALL) NOPASSWD:ALL' validate='visudo -cf %s'
+
+      # Kill the stupid java "pseudo" install
+      # configure scripts run
+    - name: rm -fr all /usr/bin/java related links
+      file: state=absent path={{ item }}
+      when: "ansible_os_family == 'Darwin'"
+      with_items: osx_java
+
+    - name: rm -fr /System/Library/Frameworks/JavaVM.framework
+      file: state=absent path=/System/Library/Frameworks/JavaVM.framework
+      when: "ansible_os_family == 'Darwin'"
