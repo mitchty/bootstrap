@@ -12,6 +12,7 @@
         - cgrep
         - hspec
         - pandoc
+        - bumper
         - c2hs
         - hi
         - hlint
