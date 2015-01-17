@@ -24,12 +24,13 @@
         - alex
         - happy
         - cpphs
+        - cabin
     - cabal_env:
         PATH: "{{ ansible_env.HOME }}/.cabal/bin:/usr/local/bin:/usr/bin:/usr/sbin:/bin:/sbin"
     - cabin_env:
         PATH: "{{ ansible_env.HOME }}/.cabin/bin:{{ ansible_env.HOME }}/.cabal/bin:/usr/local/bin:/usr/bin:/usr/sbin:/bin:/sbin"
   tasks:
-    - name: Allo haskell? Allo?
+    - name: Get installed haskell version
       command: ghc --version
       register: ghc
       ignore_errors: true
@@ -116,10 +117,6 @@
       command: cabal install {{ item }}
       with_items: regular_install
 
-    - name: install cabin
-      environment: cabal_env
-      command: cabal install cabin
-
     - name: cabin install packages
       environment: cabal_env
       command: cabin install {{ item }}
@@ -127,9 +124,13 @@
 
     - name: cabin load packages
       environment: cabal_env
-      command: cabin load {{ item }}
+      # for the love of god, everything on the planet seems to include
+      # a copy of cpphs, so nuke the stupid link so cabin still links
+      # things in ~/.cabin/bin
+      shell: >-
+        [ -e ~/.cabin/bin/cpphs ] && rm ~/.cabin/bin/cpphs; \
+        cabin load {{ item }}
       with_items: cabin_install
-      ignore_errors: true # cpphs binary is in almost everything, ungh
 
     - name: Hoogle update
       environment: cabin_env
