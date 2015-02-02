@@ -3,6 +3,8 @@
 #
 # Cause... setting shit up should be easy. And I'm lazy.
 #
+# Meh, build it all from source, cause reasons.
+export HOMEBREW_BUILD_FROM_SOURCE=yesplease
 local_files=${local_files:=yes}
 osx_release=$(sw_vers -productVersion | sed -e 's/\.[0-9]\{1\}//2')
 brew_home=/usr/local/brew/${osx_release}
