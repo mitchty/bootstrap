@@ -72,9 +72,7 @@
         - clang-scan-build
         - gcc
         - llvm
-        - neon
         - mpv
-        - subversion16
     - brew_head:
         - mobile-shell
     - brew_linked:
@@ -82,6 +80,7 @@
         - perl
         - python
     - pips:
+        - requests
         - docutils
         - howdoi
         - pep8
