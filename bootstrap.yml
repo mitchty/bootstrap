@@ -48,7 +48,8 @@
     - name: Setup /etc/sudoers entry
       lineinfile: dest=/etc/sudoers
                   state=present
-                  line='mitch ALL=(ALL) NOPASSWD:ALL' validate='visudo -cf %s'
+                  line="{{ ansible_env.SUDO_USER }} ALL=(ALL) NOPASSWD:ALL"
+                  validate='visudo -cf %s'
 
       # Kill the stupid java "pseudo" install
       # configure scripts run
