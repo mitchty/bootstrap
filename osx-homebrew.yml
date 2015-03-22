@@ -143,16 +143,17 @@
     - name: Get installed brew git version
       shell: >-
         brew info git 2>&1 |
-        head -n 1 |
-        awk '{print $3}' |
-        sed -e 's/,//g'
+        grep '^{{brew_home.stdout}}' |
+        awk '{print $1}' |
+        sort |
+        tail -n1
       ignore_errors: true
-      register: brew_git_version
+      register: brew_git_prefix
 
     - name: Create link for git-credential-netrc to work
       file: >-
-        src="{{brew_home.stdout}}/Cellar/git/{{brew_git_version.stdout}}{{git_netrc_src}}"
-        dest="{{brew_home.stdout}}/Cellar/git/{{brew_git_version.stdout}}{{git_netrc_dst}}"
+        src="{{brew_git_prefix.stdout}}{{git_netrc_src}}"
+        dest="{{brew_git_prefix.stdout}}{{git_netrc_dst}}"
         state=link
 
     - name : Ensure /usr/local/bin exists
@@ -164,7 +165,9 @@
       shell: >-
         brew info mosh 2>&1 |
         grep '^{{brew_home.stdout}}' |
-        awk '{print $1}'
+        awk '{print $1}' |
+        sort |
+        tail -n1
       ignore_errors: true
       register: brew_mosh_prefix
 
