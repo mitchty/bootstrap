@@ -51,6 +51,18 @@
                   line="{{ ansible_env.SUDO_USER }} ALL=(ALL) NOPASSWD:ALL"
                   validate='visudo -cf %s'
 
+    - name: Get gid of user
+      command: "id -g {{ansible_env.SUDO_USER}}"
+      register: user_gid
+
+    - name: /usr/local/bin
+      file: >-
+        path="/usr/local/bin"
+        state=directory
+        owner={{ansible_env.SUDO_USER}}
+        group={{user_gid.stdout}}
+
+
       # Kill the stupid java "pseudo" install
       # configure scripts run
     - name: rm -fr all /usr/bin/java related links

@@ -156,11 +156,6 @@
         dest="{{brew_git_prefix.stdout}}{{git_netrc_dst}}"
         state=link
 
-    - name : Ensure /usr/local/bin exists
-      file: >-
-        path="/usr/local/bin"
-        state=directory
-
     - name: Get mosh install PREFIX
       shell: >-
         brew info mosh 2>&1 |

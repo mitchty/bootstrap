@@ -91,7 +91,7 @@ ansible()
   fi
 
   if [ "${sut}" != "true" ]; then
-    for playbook in osx-user osx-homebrew haskell; do
+    for playbook in osx-user osx-homebrew; do
       ansible_play ${playbook}
     done
   fi
