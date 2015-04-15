@@ -86,6 +86,7 @@
         - pep8
         - pyflakes
         - flake8
+        - virtualenv
     - gems:
         - rubygems-update
         - pry
