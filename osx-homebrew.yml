@@ -6,7 +6,6 @@
   vars:
     - gem_cmd: gem
     - git_netrc_src: "/share/git-core/contrib/credential/netrc/git-credential-netrc"
-    - git_netrc_dst: "/libexec/git-core/git-credential-netrc"
     - brew_taps:
         - homebrew/dupes
         - homebrew/science
@@ -154,7 +153,7 @@
     - name: Create link for git-credential-netrc to work
       file: >-
         src="{{brew_git_prefix.stdout}}{{git_netrc_src}}"
-        dest="{{brew_git_prefix.stdout}}{{git_netrc_dst}}"
+        dest="~/bin/git-credential-netrc"
         state=link
 
     - name: Get mosh install PREFIX
