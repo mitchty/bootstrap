@@ -28,6 +28,14 @@ sut_guard()
   fi
 }
 
+xcode_setup()
+{
+  echo "Making sure that xcode/git will run"
+  cmd="sudo xcodebuild -license accept"
+  echo "${cmd}"
+  ${cmd}
+}
+
 homebrew_setup()
 {
   # Find out when crap breaks faster...ish
@@ -44,10 +52,7 @@ homebrew_setup()
   ${cmd}
 
   if [ ! -e "${brew_itself}" ]; then
-    echo "Making sure that xcode/git will run"
-    cmd="sudo xcodebuild -license accept"
-    echo "${cmd}"
-    ${cmd}
+    xcode_setup
 
     instfile="${TMPDIR}/brew-install"
     if [ ! -e "${instfile}" ]; then
@@ -105,11 +110,43 @@ ansible_play()
   ${cmd}
 }
 
+nix_setup()
+{
+  sut_guard
+  xcode_setup
+  set -xe
+  cwd=$(pwd)
+  (cd "${TMPDIR}" && curl https://nixos.org/nix/install | sh)
+  . "$HOME/.nix-profile/etc/profile.d/nix.sh"
+  dest="${HOME}/src/github.com/NixOS/nixpkgs"
+  git clone https://github.com/NixOS/nixpkgs.git "${dest}"
+  nix-channel --remove nixpkgs
+  (
+    cd "${HOME}/.nix-defexpr"
+    rm -rf *
+    ln -s "${dest}" nixpkgs
+  )
+  export NIX_PATH=${dest}:nixpkgs=${dest}
+  nix-env -iA nixpkgs.hello
+
+}
+
+maybe_nix()
+{
+ if [ "${SKIP_NIX}" == "" ]; then
+      if [ "$(uname)" = "Darwin" ]; then
+          nix_setup
+      fi
+  fi
+}
+
 maybe_homebrew()
 {
-  if [ "$(uname)" = "Darwin" ]; then
-    echo "on osx, going to install homebrew+ansible"
-    homebrew_setup
+  if [ "${SKIP_HOMEBREW}" == "" ]; then
+      if [ "$(uname)" = "Darwin" ]; then
+          echo "on osx, going to install homebrew+ansible"
+          homebrew_setup
+      fi
   fi
 }
 
@@ -127,6 +164,7 @@ homebrew)
   homebrew_setup
   ;;
 *)
+  maybe_nix
   maybe_homebrew
   ansible
   exit $?

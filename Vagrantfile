@@ -4,20 +4,12 @@
 Vagrant.configure("2") do |config|
   # For now, test on yosemite+mavericks, sort out linux/bsd later
   config.vm.define "yosemite", primary: true do |yosemite|
+    yosemite.vm.network "public_network"
     yosemite.vm.box = "yosemite"
     yosemite.vm.provider "vmware_fusion" do |v|
       v.gui = true
-      v.vmx["memsize"] = "4096"
-      v.vmx["numvcpus"] = "4"
-    end
-  end
-
-  config.vm.define "mavericks" do |mavericks|
-    mavericks.vm.box = "mavericks"
-    mavericks.vm.provider "vmware_fusion" do |v|
-      v.gui = true
-      v.vmx["memsize"] = "4096"
-      v.vmx["numvcpus"] = "4"
+      v.vmx["memsize"] = "8192"
+      v.vmx["numvcpus"] = "6"
     end
   end
 
@@ -26,5 +18,7 @@ Vagrant.configure("2") do |config|
   config.vm.provision "shell",
                       privileged: false,
                       keep_color: true,
-                      inline: "/vagrant/bootstrap.sh"
+                      inline: "
+env SKIP_HOMEBREW=#{ENV["SKIP_HOMEBREW"]} SKIP_NIX=#{ENV["SKIP_NIX"]} /vagrant/bootstrap.sh
+"
 end
