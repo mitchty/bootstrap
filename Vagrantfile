@@ -13,6 +13,8 @@ Vagrant.configure("2") do |config|
     end
   end
 
+  config.vm.synced_folder "/nfs/Developer/dotfiles", "/dotfiles"
+
   # TODO: sort out how I can do shell provision first go, then
   # provision via ansible from there on out
   config.vm.provision "shell",

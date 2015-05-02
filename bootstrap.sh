@@ -3,7 +3,6 @@
 #
 # Cause... setting shit up should be easy. And I'm lazy.
 #
-# Meh, build it all from source, cause reasons.
 export HOMEBREW_BUILD_FROM_SOURCE=yesplease
 local_files=${local_files:=yes}
 osx_release=$(sw_vers -productVersion | sed -e 's/\.[0-9]\{1\}//2')
@@ -58,7 +57,7 @@ homebrew_setup()
     if [ ! -e "${instfile}" ]; then
       echo "Install homebrew for the first time"
       trap 'rm -fr "${instfile}"; exit' INT TERM EXIT
-      git clone "https://github.com/Homebrew/homebrew" "${brew_home}"
+      git clone --depth 1 "https://github.com/Homebrew/homebrew" "${brew_home}"
       trap - INT TERM EXIT
     else
       echo "lock file found ${instfile}"
@@ -69,13 +68,16 @@ homebrew_setup()
 
   export PATH=${brew_bin}:${PATH}
 
-  for prep in git ansible; do
-    if [ ! -e "${brew_bin}/${prep}" ]; then
-      cmd="brew install ${prep}"
-      echo "${cmd}"
-      ${cmd}
-    fi
-  done
+  if [ ! -e "${brew_bin}/git" ]; then
+    cmd="brew install -v git --with-brewed-curl"
+    echo "${cmd}"
+    ${cmd}
+  fi
+  if [ ! -e "${brew_bin}/ansible" ]; then
+    cmd="brew install -v ansible"
+    echo "${cmd}"
+    ${cmd}
+  fi
 }
 
 # still a work in progress to be honest.
