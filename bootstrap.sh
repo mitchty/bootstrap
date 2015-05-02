@@ -119,7 +119,8 @@ nix_setup()
   (cd "${TMPDIR}" && curl https://nixos.org/nix/install | sh)
   . "$HOME/.nix-profile/etc/profile.d/nix.sh"
   dest="${HOME}/src/github.com/NixOS/nixpkgs"
-  git clone https://github.com/NixOS/nixpkgs.git "${dest}"
+  rm -fr "${dest}"
+  git clone --depth 1 https://github.com/NixOS/nixpkgs.git "${dest}"
   nix-channel --remove nixpkgs
   (
     cd "${HOME}/.nix-defexpr"
@@ -127,8 +128,6 @@ nix_setup()
     ln -s "${dest}" nixpkgs
   )
   export NIX_PATH=${dest}:nixpkgs=${dest}
-  nix-env -iA nixpkgs.hello
-
 }
 
 maybe_nix()
