@@ -1,0 +1,9 @@
+# If running under vagrant, we are a sut
+- name: vagrant_mount
+  command: >-
+    df -h /vagrant
+  register: sut_mount
+
+- name: sut?
+  set_fact:
+    sut: "{{ sut_mount.rc == 0 }}"

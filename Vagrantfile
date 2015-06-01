@@ -20,7 +20,5 @@ Vagrant.configure("2") do |config|
   config.vm.provision "shell",
                       privileged: false,
                       keep_color: true,
-                      inline: "
-env SKIP_HOMEBREW=#{ENV["SKIP_HOMEBREW"]} SKIP_NIX=#{ENV["SKIP_NIX"]} /vagrant/bootstrap.sh
-"
+                      inline: "/vagrant/bootstrap.sh vagrant"
 end

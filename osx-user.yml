@@ -23,6 +23,13 @@
     - kb_map_src: "HIDKeyboardModifierMappingSrc"
   # Make shit happen!
   tasks:
+    - include: sut.yml
+
+    - name: "No screensaver when testing."
+      command: >-
+        defaults -currentHost write com.apple.screensaver idleTime 0
+      when: sut
+
 # GlobalDomain type defaults
     # Caps lock sucks balls, make it control
     - name: "Get internal usb keyboard vendor/product ids"

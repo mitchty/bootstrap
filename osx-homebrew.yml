@@ -128,7 +128,7 @@
       homebrew: state=present name={{ item }}
       with_items: brew_present
 
-    - name: Install state=headhead brews
+    - name: Install state=head brews
       homebrew: state=head name={{ item }}
       with_items: brew_head
 
@@ -142,6 +142,11 @@
         tail -n1
       ignore_errors: true
       register: brew_git_prefix
+
+    - name: Ensure ~/bin exists
+      file: >-
+        dest="~/bin"
+        state=directory
 
     - name: Create link for git-credential-netrc to work
       file: >-
@@ -169,46 +174,9 @@
         - mosh-server
         - mosh-client
 
-    # all this because 10.9 doesn't include libxml2 in the platform
-    # headers, LAME, also grr
-    - name: Get libxml2 pkg path
-      shell: >-
-        brew --env libxml2 |
-        grep PKG_CONFIG_PATH |
-        awk -F'=' '{print $2}' |
-        sed -e 's/\"//g'
-      register: libxml_pkg_config_path
-
-    - name: Get libxml2 pkg libdir
-      shell: >-
-        brew --env libxml2 |
-        grep PKG_CONFIG_LIBDIR |
-        awk -F'=' '{print $2}' |
-        sed -e 's/\"//g'
-      register: libxml_pkg_config_libdir
-
-    - name: Get libxml2 CFLAGS
-      environment:
-        PKG_CONFIG_PATH: "{{libxml_pkg_config_path.stdout}}"
-        PKG_CONFIG_LIBDIR: "{{libxml_pkg_config_libdir.stdout}}"
-      command: pkg-config --cflags libxml-2.0
-      register: libxml_cflags
-
-    - name: Get libxml2 LIBS
-      environment:
-        PKG_CONFIG_PATH: "{{libxml_pkg_config_path.stdout}}"
-        PKG_CONFIG_LIBDIR: "{{libxml_pkg_config_libdir.stdout}}"
-      command: pkg-config --libs libxml-2.0
-      register: libxml_libs
-
     - name: Install Python pip modules
       environment:
-        CFLAGS: "{{libxml_cflags.stdout}}"
-        LIBS: "{{libxml_libs}}.stdout"
-        PKG_CONFIG_PATH: "{{libxml_pkg_config_path.stdout}}"
-        PKG_CONFIG_LIBDIR: "{{libxml_pkg_config_libdir.stdout}}"
         XML_CATALOG_FILES: "{{brew_home}}/etc/xml/catalog"
-        DYLD_LIBRARY_PATH: "{{brew_home}}/lib"
       command: "{{brew_home.stdout}}/bin/pip install --upgrade {{item}}"
       with_items: pips
 

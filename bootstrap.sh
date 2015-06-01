@@ -3,6 +3,11 @@
 #
 # Cause... setting shit up should be easy. And I'm lazy.
 #
+export script=$(basename "$0")
+export dir=$(cd "$(dirname "$0")"; pwd)
+export iam=${dir}/${script}
+export PATH="${PATH}:${dir}"
+
 export HOMEBREW_BUILD_FROM_SOURCE=yesplease
 local_files=${local_files:=yes}
 osx_release=$(sw_vers -productVersion | sed -e 's/\.[0-9]\{1\}//2')
@@ -98,11 +103,17 @@ ansible()
   fi
 
   if [ "${sut}" != "true" ]; then
-    for playbook in osx-user osx-homebrew; do
-      ansible_play ${playbook}
-    done
+    all_ansible_plays
   fi
 }
+
+all_ansible_plays()
+{
+  for playbook in osx-user osx-homebrew; do
+    ansible_play ${playbook}
+  done
+}
+
 
 ansible_play()
 {
@@ -116,20 +127,23 @@ nix_setup()
 {
   sut_guard
   xcode_setup
-  set -xe
+  set -e
   cwd=$(pwd)
-  (cd "${TMPDIR}" && curl https://nixos.org/nix/install | sh)
+  _tmp="/tmp/nix-setup-$$"
+  mkdir ${_tmp}
+  cd "${_tmp}"
+  curl -O https://nixos.org/nix/install
+  sh install
   . "$HOME/.nix-profile/etc/profile.d/nix.sh"
   dest="${HOME}/src/github.com/NixOS/nixpkgs"
   rm -fr "${dest}"
   git clone --depth 1 https://github.com/NixOS/nixpkgs.git "${dest}"
-  nix-channel --remove nixpkgs
-  (
-    cd "${HOME}/.nix-defexpr"
-    rm -rf *
-    ln -s "${dest}" nixpkgs
-  )
+  cd "${HOME}/.nix-defexpr"
+  rm -rf channels
+  ln -s "${dest}" nixpkgs
   export NIX_PATH=${dest}:nixpkgs=${dest}
+  rm -fr /tmp/nix-setup*
+  cd "${cwd}"
 }
 
 maybe_nix()
@@ -164,10 +178,31 @@ ansible)
 homebrew)
   homebrew_setup
   ;;
-*)
+nix)
+  maybe_nix
+  ;;
+vagrant)
+  # Add mitch user and run crap as that user.
+  osx_adduser.sh
+  sudo su -l mitch -c "$(pwd)/bootstrap.sh nix"
+  sudo su -l mitch -c "$(pwd)/bootstrap.sh vagrant-nix"
+  ;;
+nix-defaults)
+  . "$HOME/.nix-profile/etc/profile.d/nix.sh"
+  dest="${HOME}/src/github.com/NixOS/nixpkgs"
+  export NIX_PATH=${dest}:nixpkgs=${dest}
+  nix-env -iA nixpkgs.emacs24Macport nixpkgs.emacs24Packages.org
+  ;;
+old)
   maybe_nix
   maybe_homebrew
   ansible
-  exit $?
+  all_ansible_plays
+  echo "${sut}"
+  ;;
+*)
+  ${iam} nix
+#  ${iam} nix-basic
+  echo "No args given, cowardly exiting"
   ;;
 esac
