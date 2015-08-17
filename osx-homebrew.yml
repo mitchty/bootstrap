@@ -24,6 +24,8 @@
           options: universal,framework
         postgres:
           options: no-perl,no-tcl,without-python
+        mpv:
+          options: with-official-libass
     - brew_present:
         - reattach-to-user-namespace
         - gpg
@@ -63,7 +65,6 @@
         - clang-scan-build
         - gcc
         - llvm
-        - mpv
     - brew_head:
         - mobile-shell
     - brew_linked:

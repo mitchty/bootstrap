@@ -144,6 +144,7 @@ nix_setup()
   export NIX_PATH=${dest}:nixpkgs=${dest}
   rm -fr /tmp/nix-setup*
   cd "${cwd}"
+
 }
 
 maybe_nix()
@@ -191,7 +192,6 @@ nix-defaults)
   . "$HOME/.nix-profile/etc/profile.d/nix.sh"
   dest="${HOME}/src/github.com/NixOS/nixpkgs"
   export NIX_PATH=${dest}:nixpkgs=${dest}
-  nix-env -iA nixpkgs.emacs24Macport nixpkgs.emacs24Packages.org
   ;;
 old)
   maybe_nix
@@ -202,7 +202,6 @@ old)
   ;;
 *)
   ${iam} nix
-#  ${iam} nix-basic
   echo "No args given, cowardly exiting"
   ;;
 esac
