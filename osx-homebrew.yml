@@ -73,6 +73,7 @@
         - python
     - pips:
         - requests
+        - lxml
         - docutils
         - howdoi
         - pep8
